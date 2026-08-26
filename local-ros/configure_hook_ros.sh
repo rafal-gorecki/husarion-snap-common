@@ -93,13 +93,40 @@ validate_option --allow-unset "ros.localhost-only" VALID_ROS_LOCALHOST_ONLY_OPTI
 
 ROS_LOCALHOST_ONLY="$(snapctl get ros.localhost-only)"
 
-if [ -n "$ROS_LOCALHOST_ONLY" ]; then
-  echo "export ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}" >> "${ROS_ENV_TMP}"
-  echo "ros.localhost-only=${ROS_LOCALHOST_ONLY}" >> ${ROS_SNAP_ARGS_TMP}
-else
+if [[ $ROS_DISTRO == "jazzy" ]]; then
+  # ROS_LOCALHOST_ONLY was deprecated in Iron in favor of
+  # ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST; rcl only reads it as a fallback
+  # when ROS_AUTOMATIC_DISCOVERY_RANGE is unset, so exporting it here would
+  # just be piggybacking on that fallback path instead of setting the real
+  # variable. Never export it on jazzy — translate the legacy key into the
+  # canonical one instead, and only when the operator hasn't set
+  # ros.automatic-discovery-range explicitly (that key always wins, handled
+  # above).
   echo "unset ROS_LOCALHOST_ONLY" >> "${ROS_ENV_TMP}"
-  echo "ros.localhost-only=''" >> ${ROS_SNAP_ARGS_TMP}
-  snapctl set ros.localhost-only=''
+  if [ -z "$ROS_AUTOMATIC_DISCOVERY_RANGE" ] && [ -n "$ROS_LOCALHOST_ONLY" ]; then
+    if [ "$ROS_LOCALHOST_ONLY" = "1" ]; then
+      echo "export ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST" >> "${ROS_ENV_TMP}"
+    else
+      echo "export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET" >> "${ROS_ENV_TMP}"
+    fi
+  fi
+  if [ -n "$ROS_LOCALHOST_ONLY" ]; then
+    echo "ros.localhost-only=${ROS_LOCALHOST_ONLY}" >> ${ROS_SNAP_ARGS_TMP}
+  else
+    echo "ros.localhost-only=''" >> ${ROS_SNAP_ARGS_TMP}
+    snapctl set ros.localhost-only=''
+  fi
+else
+  # Humble has no ROS_AUTOMATIC_DISCOVERY_RANGE — ROS_LOCALHOST_ONLY is the
+  # only lever available there.
+  if [ -n "$ROS_LOCALHOST_ONLY" ]; then
+    echo "export ROS_LOCALHOST_ONLY=${ROS_LOCALHOST_ONLY}" >> "${ROS_ENV_TMP}"
+    echo "ros.localhost-only=${ROS_LOCALHOST_ONLY}" >> ${ROS_SNAP_ARGS_TMP}
+  else
+    echo "unset ROS_LOCALHOST_ONLY" >> "${ROS_ENV_TMP}"
+    echo "ros.localhost-only=''" >> ${ROS_SNAP_ARGS_TMP}
+    snapctl set ros.localhost-only=''
+  fi
 fi
 
 # Make sure ROS_DOMAIN_ID is valid
