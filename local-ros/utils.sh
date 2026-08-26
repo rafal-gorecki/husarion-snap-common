@@ -551,6 +551,37 @@ source_ros() {
     fi
 }
 
+# Seed ${SNAP_COMMON}/rmw/ from the snap's factory snapshot. Idempotent.
+# --force overwrites (install); default copies only missing files so
+# operator edits survive (configure, on every refresh).
+seed_rmw_tree() {
+    local force=0
+    [ "${1:-}" = "--force" ] && force=1
+
+    local src="${SNAP}/usr/share/husarion-snap-common/config/rmw"
+    local dst="${SNAP_COMMON}/rmw"
+    [ -d "$src" ] || return 0
+
+    mkdir -p "${dst}/fastdds" "${dst}/cyclonedds" "${dst}/zenoh" "${dst}/zenoh-router"
+
+    local sub f name
+    for sub in fastdds cyclonedds zenoh zenoh-router; do
+        [ -d "${src}/${sub}" ] || continue
+        for f in "${src}/${sub}"/*; do
+            [ -e "$f" ] || continue
+            name=$(basename "$f")
+            if [ "$force" = "1" ] || [ ! -e "${dst}/${sub}/${name}" ]; then
+                cp -f "$f" "${dst}/${sub}/${name}"
+            fi
+        done
+    done
+
+    ln -sfn rmw/fastdds/udp.xml       "${SNAP_COMMON}/dds-config-udp.xml"
+    ln -sfn rmw/fastdds/shm.xml       "${SNAP_COMMON}/dds-config-shm.xml"
+    ln -sfn rmw/fastdds/udp-lo.xml    "${SNAP_COMMON}/dds-config-udp-lo.xml"
+    ln -sfn rmw/cyclonedds/udp-lo.xml "${SNAP_COMMON}/dds-config-udp-lo-cyclone.xml"
+}
+
 # Function to check the type of the provided XML file
 check_xml_profile_type() {
     local xml_file="$1"

@@ -10,6 +10,11 @@ source $SNAP/usr/bin/utils.sh
 
 source_ros
 
+# Self-heal: the install hook seeds rmw/ but doesn't run on refresh, so a
+# robot upgraded across the 0.5.0→0.6.0 layout change has no rmw/ tree and
+# transport resolution below would abort the refresh on a missing profile.
+seed_rmw_tree
+
 # Create the ${SNAP_COMMON}/ros.env file and export variables (for bash session running ROS2)
 ROS_ENV_FILE="${SNAP_COMMON}/ros.env"
 

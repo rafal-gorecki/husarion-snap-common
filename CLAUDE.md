@@ -6,9 +6,9 @@ Shared library / staging tree for Husarion ROS 2 snaps. Pulled in by `rosbot-sna
 
 | Path | What |
 |---|---|
-| `local-ros/configure_hook_ros.sh` | Runs from the consuming snap's `configure` hook on every `snap set` / `snap unset`. Validates `ros.*` keys, resolves `ros.transport` → `RMW_IMPLEMENTATION` + profile path, writes `${SNAP_COMMON}/ros.env`. |
-| `local-ros/install_hook_ros.sh` | Runs from the consuming snap's `install` hook on first install. Sets default `ros.*` values, seeds the `${SNAP_COMMON}/rmw/` tree from the factory snapshot, drops back-compat `dds-config-*.xml` symlinks. |
-| `local-ros/utils.sh` | Shell helpers: `validate_option`, `validate_keys`, `validate_number`, `validate_regex`, `validate_path`, `validate_config_param`, `validate_ipv4_addr`, `validate_peers_list`, `check_xml_profile_type`, `log_and_echo`, `source_ros`. Sourced by every other script. |
+| `local-ros/configure_hook_ros.sh` | Runs from the consuming snap's `configure` hook on every `snap set` / `snap unset` / refresh. Re-seeds any missing `${SNAP_COMMON}/rmw/` files (`seed_rmw_tree`, self-heal for robots upgraded across the 0.5.0→0.6.0 layout change — the install hook doesn't run on refresh), validates `ros.*` keys, resolves `ros.transport` → `RMW_IMPLEMENTATION` + profile path, writes `${SNAP_COMMON}/ros.env`. |
+| `local-ros/install_hook_ros.sh` | Runs from the consuming snap's `install` hook on first install. Sets default `ros.*` values, force-seeds the `${SNAP_COMMON}/rmw/` tree from the factory snapshot (`seed_rmw_tree --force`), drops back-compat `dds-config-*.xml` symlinks. |
+| `local-ros/utils.sh` | Shell helpers: `validate_option`, `validate_keys`, `validate_number`, `validate_regex`, `validate_path`, `validate_config_param`, `validate_ipv4_addr`, `validate_peers_list`, `check_xml_profile_type`, `seed_rmw_tree`, `log_and_echo`, `source_ros`. Sourced by every other script. |
 | `local-ros/ros_setup.sh` | Sources `${SNAP_COMMON}/ros.env` then `exec`s "$@" — used as a command-chain wrapper for ROS apps. |
 | `local-ros/{start,stop,restart}_launcher.sh` | systemctl-via-snapctl thin wrappers. |
 | `local-ros/check_daemon_running.sh` | Small probe used by app commands. |
