@@ -22,7 +22,20 @@ STATE_DIR="${SNAP_COMMON}/husarion-agent"
 SOCK="${STATE_DIR}/agent.sock"
 PANELS_DEFAULT="${SNAP}/usr/share/husarion-agent/panels.d"
 PANELS_OVERRIDES="${STATE_DIR}/panels.d"
-mkdir -p "$STATE_DIR" "$PANELS_OVERRIDES" "${SNAP_COMMON}/peer-certs"
+# Same two-directory idiom as panels. Both dirs must live under the
+# snap-confined $SNAP (read-only, package-shipped) / $SNAP_COMMON
+# (writable, operator-editable) tree — NOT husarion-agent's own bare CLI
+# defaults (/usr/share/husarion-agent/advisories.d, /etc/husarion-agent/
+# advisories.d), which are host-absolute paths a strict-confinement
+# AppArmor profile denies. Left unset once, that denial used to crash-loop
+# the whole daemon on every boot (HW 2026-08-26, rosbot: agent never got
+# past startup, so it never reached its peer follow-task and ROS_NAMESPACE
+# never cascaded to the snap). husarion-agent now degrades a denied
+# overrides dir gracefully too (belt and suspenders), but the daemon
+# should never be pointed at an unreachable path in the first place.
+ADVISORIES_DEFAULT="${SNAP}/usr/share/husarion-agent/advisories.d"
+ADVISORIES_OVERRIDES="${STATE_DIR}/advisories.d"
+mkdir -p "$STATE_DIR" "$PANELS_OVERRIDES" "$ADVISORIES_OVERRIDES" "${SNAP_COMMON}/peer-certs"
 
 # Seed the files-first config-root from the snap-shipped seed.
 #   identity + topology + initial config (agent.yaml / follow.yaml /
@@ -32,19 +45,23 @@ mkdir -p "$STATE_DIR" "$PANELS_OVERRIDES" "${SNAP_COMMON}/peer-certs"
 #   newer code wins (shipped > whatever was staged before).
 SEED_ROOT="${SNAP}/usr/share/husarion-agent/config-seed"
 if [ -d "$SEED_ROOT" ]; then
+    # --no-preserve=ownership: cp -a's chown of the copy to the source's uid
+    # needs CAP_CHOWN, which strict confinement's default daemon profile
+    # doesn't grant even to a root-run service — copy as the running user
+    # instead (mode/timestamps still preserved).
     for item in agent.yaml follow.yaml config; do
         if [ -e "$SEED_ROOT/$item" ] && [ ! -e "$STATE_DIR/$item" ]; then
-            cp -a "$SEED_ROOT/$item" "$STATE_DIR/$item"
+            cp -a --no-preserve=ownership "$SEED_ROOT/$item" "$STATE_DIR/$item"
         fi
     done
     if [ -d "$SEED_ROOT/hooks" ]; then
         mkdir -p "$STATE_DIR/hooks"
-        cp -a "$SEED_ROOT/hooks/." "$STATE_DIR/hooks/"
+        cp -a --no-preserve=ownership "$SEED_ROOT/hooks/." "$STATE_DIR/hooks/"
         find "$STATE_DIR/hooks" -type f -exec chmod 0755 {} +
     fi
     if [ -d "$SEED_ROOT/manifests" ]; then
         mkdir -p "$STATE_DIR/manifests"
-        cp -a "$SEED_ROOT/manifests/." "$STATE_DIR/manifests/"
+        cp -a --no-preserve=ownership "$SEED_ROOT/manifests/." "$STATE_DIR/manifests/"
     fi
 fi
 
@@ -84,4 +101,6 @@ exec "${SNAP}/usr/bin/husarion-agent" \
     --config-root "$STATE_DIR" \
     --panels-default "$PANELS_DEFAULT" \
     --panels-overrides "$PANELS_OVERRIDES" \
+    --advisories-default "$ADVISORIES_DEFAULT" \
+    --advisories-overrides "$ADVISORIES_OVERRIDES" \
     $extra $content_extra
